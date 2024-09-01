@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 19.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   id="Capa_1"
+   x="0px"
+   y="0px"
+   viewBox="0 0 480.001 480.001"
+   style="enable-background:new 0 0 480.001 480.001;"
+   xml:space="preserve"
+   sodipodi:docname="blockchain.svg"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)"><metadata
+   id="metadata13"><rdf:RDF><cc:Work
+       rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
+         rdf:resource="http://purl.org/dc/dcmitype/StillImage" /></cc:Work></rdf:RDF></metadata><defs
+   id="defs11"><linearGradient
+     inkscape:collect="always"
+     id="linearGradient4527"><stop
+       style="stop-color:#000000;stop-opacity:1;"
+       offset="0"
+       id="stop4523" /><stop
+       style="stop-color:#000000;stop-opacity:0;"
+       offset="1"
+       id="stop4525" /></linearGradient><linearGradient
+     inkscape:collect="always"
+     xlink:href="#linearGradient4527"
+     id="linearGradient4529"
+     x1="23.5"
+     y1="240.00062"
+     x2="456.50059"
+     y2="240.00062"
+     gradientUnits="userSpaceOnUse" /></defs><sodipodi:namedview
+   pagecolor="#ffffff"
+   bordercolor="#666666"
+   borderopacity="1"
+   objecttolerance="10"
+   gridtolerance="10"
+   guidetolerance="10"
+   inkscape:pageopacity="0"
+   inkscape:pageshadow="2"
+   inkscape:window-width="1088"
+   inkscape:window-height="667"
+   id="namedview9"
+   showgrid="false"
+   inkscape:zoom="0.49166564"
+   inkscape:cx="-76.271346"
+   inkscape:cy="240.0005"
+   inkscape:window-x="0"
+   inkscape:window-y="0"
+   inkscape:window-maximized="0"
+   inkscape:current-layer="Capa_1" />
+<g
+   id="g6"
+   style="stroke:#ffffff;stroke-opacity:1;fill:#ffffff;fill-opacity:1">
+	<g
+   id="g4"
+   style="stroke:#ffffff;stroke-opacity:1;fill:#ffffff;fill-opacity:1">
+		<path
+   d="M416,224.001c3.156-0.01,6.01-1.875,7.288-4.76l0.056-0.128l31.936-71.856c0.466-1.023,0.711-2.132,0.72-3.256v-136    c0.053-4.365-3.442-7.947-7.807-8C448.129,0,448.064,0,448,0.001H304c-3.047-0.017-5.838,1.699-7.2,4.424l-32,64h0.08    c-0.574,1.105-0.875,2.331-0.88,3.576v64h-48v-128c0.053-4.365-3.442-7.947-7.807-8C208.129,0,208.064,0,208,0.001H64    c-3.032-0.001-5.805,1.712-7.16,4.424l-32,64h0.08c-0.588,1.102-0.903,2.328-0.92,3.576v144c0,4.418,3.582,8,8,8h64v32H64    c-3.032-0.001-5.805,1.712-7.16,4.424l-32,64h0.08c-0.588,1.102-0.903,2.328-0.92,3.576v144c0,4.418,3.582,8,8,8h144    c3.156-0.01,6.01-1.875,7.288-4.76l0.056-0.128l29.856-67.112H264v64c0,4.418,3.582,8,8,8h144c3.156-0.01,6.01-1.875,7.288-4.76    l0.056-0.128l31.936-71.856c0.466-1.023,0.711-2.132,0.72-3.256v-136c0.053-4.365-3.442-7.947-7.807-8    c-0.064-0.001-0.129-0.001-0.193,0h-96v-32H416z M440,142.305l-16,36V73.889l16-32V142.305z M308.944,16.001h126.112l-24,48    H284.944L308.944,16.001z M184,136.001V73.889l16-32v94.112H184z M195.688,152.001L184,178.305v-26.304H195.688z M68.944,16.001    h126.112l-24,48H44.944L68.944,16.001z M40,208.001v-128h128v56H96v16h72v56H40z M68.944,272.001H96v48H44.944L68.944,272.001z     M168,464.001H40v-128h56v72h16v-72h56V464.001z M171.056,320.001H112v-48h83.056L171.056,320.001z M184,434.305v-26.304h11.688    L184,434.305z M200,392.001h-16v-62.112l16-32V392.001z M264.8,324.425h0.08c-0.574,1.105-0.875,2.331-0.88,3.576v64h-48v-128    c0.053-4.365-3.442-7.947-7.807-8c-0.064-0.001-0.129-0.001-0.193,0h-96v-32h64c3.156-0.01,6.01-1.875,7.288-4.76l0.056-0.128    l29.856-67.112H264v64c0,4.418,3.582,8,8,8h64v32h-32c-3.047-0.017-5.838,1.699-7.2,4.424L264.8,324.425z M336,272.001v48h-51.056    l24-48H336z M408,464.001H280v-56h72v-16h-72v-56h128V464.001z M440,398.305l-16,36V329.889l16-32V398.305z M435.056,272.001    l-24,48H352v-48H435.056z M336,136.001v72h-56v-128h128v128h-56v-72H336z"
+   id="path2"
+   style="stroke:#ffffff;stroke-opacity:1;fill:#ffffff;fill-opacity:1" />
+	</g>
+</g>
+</svg>

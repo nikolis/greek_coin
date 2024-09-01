@@ -1,0 +1,14 @@
+version: '3.5'
+
+services:
+  web:
+    image: "greek_coin:latest"
+    environment:
+        - DATABASE_HOST=DATABASE_HOST
+        - hostname="localhost"
+    network_mode: host
+    ports:
+        - "80"
+        - "443"
+    env_file:
+      - docker.env

@@ -1,0 +1,807 @@
+port module Page.Exchange.Transactions exposing (Model, Msg(..), init, update, view, Status(..), subscriptions)
+
+import Session exposing (Session)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
+import Asset
+import Api2.Data exposing (Currency, AssetMetaInfo, Action, ExchangeRequestResponse,TransactionRequest, KrakenMetaResponse )
+import Api2.Happy exposing (DetailedError(..),  exchangeRequest, exchangeRequestVerification)
+import List.Extra 
+import Json.Encode as E
+import Round
+import Dict exposing (Dict)
+import Http
+import Bootstrap.Modal as Modal
+import Bootstrap.Button as Button
+import Bootstrap.Grid.Col as Col
+import Bootstrap.Grid as Grid
+import Bootstrap.Dropdown as Dropdown
+
+import Json.Decode exposing (string, decodeString, float, int, Value, decodeValue, Decoder)
+
+port resetSelect : E.Value -> Cmd msg
+port resetSelectFirst : E.Value -> Cmd msg
+
+type alias Model = 
+    {
+      session: Session
+     , window : ActionWindow
+     , config : Maybe Preconfiguration
+     , first : Maybe Currency
+     , fromNumberString : String
+     , toNumberString : String
+     , assetPairsCurr : Status (List AssetPairCurrency)
+     , resetParam : Bool
+     , resetParamFirst : Bool
+     , fromNumber : Float
+     , toNumber : Float
+     , second : Maybe Currency
+     , feedMeta : Maybe (Dict String AssetMetaInfo)
+     , changeFirst : Bool
+     , toNumberSell : Float
+     , actions : List Action
+     , modalVisibility : Modal.Visibility
+     , message : String
+     , messageTitle : String
+     , modalTransaction : Maybe TransactionRequest
+     , showDialog : Bool
+     , modalAction : Int
+     , modalToken : String
+     , myDrop1State : Dropdown.State
+     , myDrop2State : Dropdown.State
+    }
+
+init: Session -> Maybe Preconfiguration -> (Model, Cmd Msg)
+init session preConfig = 
+    let
+        md = 
+          { session = session 
+          , window = Buy
+          , config = preConfig
+          , first = Nothing
+          , fromNumberString = "0"
+          , toNumberString = "0"
+          , assetPairsCurr = Loading
+          , resetParam = False
+          , resetParamFirst = False
+          , fromNumber = 0
+          , toNumber = 0.0
+          , second = Nothing
+          , feedMeta = Nothing
+          , changeFirst = True
+          , toNumberSell = 0.00 
+          , actions = []
+          , modalVisibility = Modal.hidden
+          , message = ""
+          , messageTitle = ""
+          , modalTransaction = Nothing
+          , showDialog = False
+          , modalAction = 2
+          , modalToken = ""
+          , myDrop1State = Dropdown.initialState
+          , myDrop2State = Dropdown.initialState
+          }
+    in
+    (md, Cmd.none)
+
+type Status a
+    = Loading
+    | LoadingSlowly
+    | Loaded a
+    | Failed
+
+type alias Preconfiguration = 
+    {
+      currencyId : Int
+    , ammount : Float
+    }
+
+type alias AssetPairCurrency = 
+    {
+        alternateName : String
+    ,   primaryName : String
+    ,   wsName : String
+    ,   base : Currency
+    ,   quote : Currency
+    ,   decimals : Int
+    }
+
+type ActionWindow 
+    = Buy
+    | Sell
+    | Exchange
+
+type Msg =
+      ChangeWindow ActionWindow
+    | SendRequest
+    | ChangeToNumb String
+    | ChangeFromNumbHand String
+    | SecondSet Currency
+    | FirstSet Currency
+    | ChangeFromNumb String
+    | CompletedTransactionRequestSubmited (Result (DetailedError String) (Http.Metadata, ExchangeRequestResponse))
+    | ShowModal
+    | CloseModal Int String
+    | GotAssetPairCurr (List AssetPairCurrency)
+    | GetMetaInfoGroup (Dict String AssetMetaInfo)
+    | MyDrop1Msg Dropdown.State
+    | MyDrop2Msg Dropdown.State
+
+actionFromString: Model -> String -> Maybe Action
+actionFromString model title =
+  let
+    found = List.head (List.filter (\m -> m.title == title) model.actions)
+  in  
+  found
+
+exchangeRequestCreator : Model -> Int -> Cmd Msg
+exchangeRequestCreator model type_=
+  case model.assetPairsCurr of
+      Loaded assetPairs->
+        let
+            actionM = 
+                case model.window of
+                    Buy ->
+                      actionFromString model "Buy"
+                    Sell ->
+                      actionFromString model "Sell"
+                    Exchange ->
+                      actionFromString model "Exchange"
+
+        in
+        case actionM of
+            Just action ->
+               case model.first of
+                   Just first ->
+                       case model.second of
+                           Just second ->
+                               let
+                                 filteredList = List.filter (\assetPair -> assetPair.base == first && assetPair.quote == second)  assetPairs
+                                 assetPairMaybe = List.head filteredList
+                               in
+                               case assetPairMaybe of
+                                   Just assetPair ->
+                                             case model.feedMeta of
+                                                 Just feedDic ->
+                                                     case Dict.get assetPair.primaryName feedDic of
+                                                         Just metaInfo ->
+                                                            case String.toFloat metaInfo.a.price of
+                                                               Just price -> 
+                                                                  if type_ == 1 then
+                                                                    exchangeRequest model.session  assetPair.quote assetPair.base action model.fromNumber price assetPair.base.fee CompletedTransactionRequestSubmited assetPair.primaryName                                                                 else 
+                                                                    exchangeRequest model.session assetPair.quote assetPair.base  action model.fromNumber price assetPair.base.fee CompletedTransactionRequestSubmited assetPair.primaryName
+                                                               Nothing ->
+                                                                 Cmd.none
+                                                         Nothing ->
+                                                             Cmd.none
+                                                 Nothing ->
+                                                     Cmd.none    
+                                   Nothing ->
+                                       Cmd.none
+                           Nothing ->
+                               Cmd.none
+                   Nothing ->
+                       Cmd.none
+            Nothing ->
+                let
+                    _= Debug.log "No Action"
+                in
+                Cmd.none
+      _ ->
+          Cmd.none
+
+update : Msg -> Model -> (Model, Cmd Msg)
+update msg model =
+    case msg of
+       MyDrop2Msg state ->
+           ( {model | myDrop2State = state}, Cmd.none)
+       MyDrop1Msg state ->
+            ( { model | myDrop1State = state }
+            , Cmd.none
+            )
+
+       GetMetaInfoGroup krakenResponse ->
+           let
+               model_new = {model | feedMeta = Just krakenResponse}
+           in
+           update (ChangeFromNumb (String.fromFloat model_new.fromNumber)) model_new
+
+       CloseModal action token->
+         case action of
+             1 ->
+              ( { model | modalVisibility = Modal.hidden, message = "", messageTitle = "" , modalAction = 2, modalToken = "" }
+              , exchangeRequestVerification model.session token CompletedTransactionRequestSubmited
+              )
+             _ ->
+              ( { model | modalVisibility = Modal.hidden, message = "", messageTitle = "" , modalAction = 2, modalToken = "" }
+              , Cmd.none 
+              )
+
+       ShowModal ->
+            ( { model | modalVisibility = Modal.shown }
+            , Cmd.none
+            )
+
+       SendRequest ->
+           case model.window of
+               Sell ->
+                  (model, exchangeRequestCreator model 2)
+               Buy ->
+                  (model, exchangeRequestCreator model 1)
+               Exchange ->
+                  (model, exchangeRequestCreator model 3)
+
+       CompletedTransactionRequestSubmited (Err httpError) ->
+           case httpError of
+               BadStatuss metadata body ->
+                   let
+                       _ = Debug.log "the body" body
+                       result = (Json.Decode.decodeString string body)
+                   in
+                   case result of
+                       Err error ->
+                           let
+                               _ = Debug.log "another error" error
+                           in
+                           ( model, Cmd.none)
+                       Ok sthing ->
+                           let
+                               md = {model | message = sthing, messageTitle = "Error!",  showDialog = True}
+                           in
+                           update ShowModal md
+               _ ->
+                   (model, Cmd.none)
+
+       CompletedTransactionRequestSubmited (Ok respMsg) ->
+           let
+            (_, data) = respMsg
+            md = 
+              case data.status of
+                  2 ->
+                    let
+                        _ = Debug.log "TRnsaction " data.transaction
+                    in
+                    {model | message = "Successfully submited Transaction", messageTitle = "Success!", showDialog = True, modalTransaction = Just data.transaction} 
+                  1 ->
+                    let
+                        _ = Debug.log "TRnsaction " data.transaction
+                    in
+ 
+                    {model | message = "Please Verify the request", modalAction = 1, modalToken = data.token, messageTitle = "Verification needed", showDialog = True, modalTransaction = Just data.transaction}
+                  _ ->
+                    model  
+           in
+           ({md | modalVisibility = Modal.shown}, Cmd.none)
+
+       ChangeWindow action->
+           case action of
+               Exchange ->
+                   case model.assetPairsCurr of
+                       Loaded assetPairs ->
+                           let
+                              pairs = List.filter (\assetPair -> not (String.contains "EUR" assetPair.quote.title )) assetPairs
+                           in
+                           case List.head pairs of
+                               Just pair ->
+                                   let 
+                                       md = {model | first = Just pair.base, second = Just pair.quote, window = action, resetParamFirst = True}
+                                   in
+                                   update (ChangeFromNumb (String.fromFloat model.fromNumber)) md
+                               Nothing ->
+                                   (model, Cmd.none)
+
+                       _ ->
+                           (model, Cmd.none)
+               Buy ->
+                   case model.assetPairsCurr of
+                       Loaded assetPairs ->
+                           let
+                              pairs = List.filter (\assetPair ->  (String.contains "EUR" assetPair.quote.title )) assetPairs
+                           in
+                           case List.head pairs of
+                               Just pair ->
+                                   let
+                                       md = {model | first = Just pair.base, second = Just pair.quote, window = action, resetParamFirst = True}
+                                   in
+                                   update (ChangeFromNumb (String.fromFloat model.fromNumber)) md
+                               Nothing ->
+                                   (model, Cmd.none)
+
+                       _ ->
+                           (model, Cmd.none)
+
+               Sell ->
+                   case model.assetPairsCurr of
+                       Loaded assetPairs ->
+                           let
+                              pairs = List.filter (\assetPair ->  (String.contains "EUR" assetPair.quote.title )) assetPairs
+                           in
+                           case List.head pairs of
+                               Just pair ->
+                                   let 
+                                       md = {model | first = Just pair.base, second = Just pair.quote, window = action, resetParamFirst = True}
+                                   in
+                                   update (ChangeFromNumb (String.fromFloat model.fromNumber)) md
+                               Nothing ->
+                                   (model, Cmd.none)
+
+                       _ ->
+                           (model, Cmd.none)
+
+       FirstSet parameter ->
+           case model.assetPairsCurr of
+               Loaded assetPairs ->
+                 let
+                   list =  List.filter (\assetPair -> assetPair.base == parameter) assetPairs
+                   assetPairsFiltered =
+                         case model.window of
+                             Exchange ->
+                                 let
+                                     listAll = List.filter (\assetPair -> not (String.contains "EUR" assetPair.quote.title ) && assetPair.base == parameter) assetPairs
+                                 in
+                                 listAll 
+                             _ ->
+                                List.filter (\assetPair -> (String.contains "EUR" assetPair.quote.title && assetPair.base == parameter))  assetPairs
+
+                   secondFirst = List.head assetPairsFiltered
+                   md = 
+                       case secondFirst of
+                           Just assetPair ->
+                              {model | first = Just parameter , second =Just assetPair.quote, resetParam = True}
+                           Nothing ->
+                              {model | first = Just parameter, second = Nothing, resetParam = True}
+                 in
+                 update (ChangeFromNumb (String.fromFloat model.fromNumber)) md
+               _ ->
+                   (model, Cmd.none)
+
+       SecondSet parameter ->
+           let
+               md = { model | second = Just parameter}
+           in
+           update (ChangeFromNumb (String.fromFloat model.fromNumber)) md
+
+       ChangeFromNumb val ->
+           if model.changeFirst then
+              let
+                  _ = Debug.log "Change from " model.changeFirst
+              in 
+              valueChange (String.fromFloat model.fromNumber) model
+           else
+              valueChange (String.fromFloat model.toNumber) model
+
+       ChangeFromNumbHand val ->
+           let
+               md = {model | changeFirst = True}
+           in
+           valueChange val md
+
+       ChangeToNumb val ->
+           let
+               md = {model | changeFirst = False}
+           in
+           valueChange val md
+
+       GotAssetPairCurr assetPairCurr ->
+           let
+                    (firstIcon, secondIcon) =
+                      case model.config of 
+                          Just config ->
+                              let
+                                theListPre = List.filter (\assetPair -> assetPair.base.id == config.currencyId && (String.contains "EUR" assetPair.quote.title)) assetPairCurr
+                              in
+                              case List.head theListPre of
+                                  Just assetPair ->
+                                    (Just assetPair.base, Just assetPair.quote)
+                                  Nothing -> 
+                                   case List.head assetPairCurr of
+                                     Just assetPair ->
+                                        (Just assetPair.base, Just assetPair.quote)
+                                     Nothing ->
+                                        (Nothing, Nothing)
+
+                          Nothing ->
+                              case List.head assetPairCurr of
+                                Just assetPair ->
+                                    (Just assetPair.base, Just assetPair.quote)
+                                Nothing ->
+                                    (Nothing, Nothing)
+                      
+                    (ammountTo, ammountToString, firstChange) = 
+                        case model.config of
+                            Just config ->
+                                (config.ammount, String.fromFloat config.ammount, False)
+                            Nothing ->
+                                (0, "0", True)
+
+           in
+           ({ model | first = firstIcon, second = secondIcon, assetPairsCurr = Loaded assetPairCurr, toNumber = ammountTo, toNumberString = ammountToString, changeFirst = firstChange}, Cmd.none)
+
+
+
+resetParams : Model -> Cmd Msg
+resetParams model =
+   let 
+    first = 
+      case model.resetParamFirst of 
+         True ->
+             resetSelectFirst (E.string "")
+         False ->
+             Cmd.none
+    second = 
+      case model.resetParam of
+          True ->
+              resetSelect (E.string "")
+          False ->
+              Cmd.none
+   in
+   Cmd.batch[first, second]
+
+getPriceFromCurrency : Int ->  Currency ->  Float -> Float -> Bool -> (Float, Float)
+getPriceFromCurrency decimals currency cost ammount changeFirst =
+  if changeFirst then
+     let
+        sintBuy = (currency.fee/100)+1
+        endValBuy = sintBuy* cost
+        retValBuy = (endValBuy * ammount)
+
+        sintSell = 1- (currency.fee/100)
+        endValSell = sintSell* cost
+        retValSell = (endValSell * ammount)
+     in
+     (Round.roundNum decimals retValBuy, Round.roundNum decimals retValSell)
+  else 
+     let
+        sintBuy = (currency.fee/100)+1
+        endValBuy = sintBuy* cost
+        retValBuy = ( ammount/endValBuy)
+
+        sintSell = 1- (currency.fee/100)
+        endValSell = sintSell* cost
+        retValSell = (ammount /endValSell)
+     in
+     (Round.roundNum decimals retValBuy, Round.roundNum decimals retValSell)
+
+
+
+valueChange : String -> Model -> (Model, Cmd Msg)
+valueChange val model = 
+     case String.toFloat val of
+                      Nothing ->
+                          case String.toFloat (val++"0") of
+                              Just flNumb ->
+                                ({model |fromNumber = 0, toNumber = 0, fromNumberString = val}, Cmd.none)
+                              Nothing ->
+                                (model, Cmd.none)
+                      Just numb ->
+                          case model.first of 
+                              Just first ->
+                                  case  model.second of
+                                      Just second ->
+                                         case model.assetPairsCurr of
+                                             Loaded pairs ->
+                                                 let
+                                                     _ = Debug.log "first " first
+                                                     _ = Debug.log "second" second
+                                                     _ = Debug.log "value" numb
+                                                     pairsFiltered = List.filter (\pair -> pair.base == first && pair.quote == second) pairs
+                                                 in
+                                                 case List.head pairsFiltered of
+                                                     Just thePair ->
+                                                         case model.feedMeta of
+                                                             Just feedMeta ->
+                                                                 case Dict.get thePair.primaryName feedMeta of
+
+                                                                     Just price ->
+                                                                         case String.toFloat price.a.price of
+                                                                             Just priceNumb ->
+                                                                                 if model.changeFirst then
+                                                                                   let
+                                                                                      (endResultBuy, endResultSell) = getPriceFromCurrency thePair.decimals thePair.base  priceNumb numb model.changeFirst
+                                                                                      endResult = 
+                                                                                           case model.window of
+                                                                                               Buy ->
+                                                                                                   endResultBuy
+                                                                                               Sell -> 
+                                                                                                   endResultSell
+                                                                                               Exchange ->
+                                                                                                   endResultBuy
+                                                                                   in
+                                                                                   ({model | fromNumber = numb, toNumber = endResultBuy, toNumberSell = endResultSell, fromNumberString = val, resetParam = False, resetParamFirst = False, toNumberString = (String.fromFloat endResult)}, resetParams model)
+                                                                                 else 
+                                                                                   let 
+                                                                                       (endResultFrom, endResultFromSell) = getPriceFromCurrency thePair.decimals thePair.base  priceNumb numb model.changeFirst
+                                                                                       endResult = 
+                                                                                           case model.window of
+                                                                                               Buy ->
+                                                                                                   endResultFrom
+                                                                                               Sell -> 
+                                                                                                   endResultFromSell
+                                                                                               Exchange ->
+                                                                                                   endResultFrom
+                                                                                   in
+                                                                                   ({model | fromNumber = endResult, fromNumberString = (String.fromFloat endResult), toNumber = numb,toNumberString = (String.fromFloat numb), resetParam = False, resetParamFirst = False}, resetParams model) 
+
+                                                                             Nothing ->
+                                                                                    ({model | fromNumber = numb, toNumber = -1 ,fromNumberString = val, resetParam = False, resetParamFirst = False}, 
+                                                                                     resetParams model)
+
+                                                                     Nothing ->
+                                                                         case Dict.get thePair.alternateName feedMeta of
+                                                                             Just price ->
+
+                                                                                case String.toFloat price.a.price of
+                                                                                   Just nmbr ->
+                                                                                    let
+                                                                                      (endResultBuy, endResultSell) = getPriceFromCurrency thePair.decimals thePair.base numb nmbr model.changeFirst
+                                                                                     in
+                                                                                     ({model | fromNumber = numb, toNumber = endResultBuy, toNumberSell = endResultSell, fromNumberString = val, resetParamFirst = False}, resetParams model)
+                                                                                   Nothing ->
+                                                                                     ({model | fromNumber = numb, toNumber = -1 ,fromNumberString = val, resetParam = False, resetParamFirst = False}, resetParams model)
+                                                                             Nothing ->
+                                                                                ({model | fromNumber = numb, fromNumberString = val, toNumber = -1, resetParamFirst = False ,resetParam = False}, resetParams model)
+
+                                                             Nothing ->
+                                                                 ({model | fromNumber = 0, toNumber = -140, fromNumberString = val, resetParam = False, resetParamFirst = False}, resetParams model)
+
+                                                     Nothing ->
+                                                         ({model | fromNumber = 0, toNumber = -130, fromNumberString = val, resetParam = False, resetParamFirst = False}, resetParams model)
+
+                                             _ ->
+                                                 ({model | fromNumber = 0, toNumber = -110, fromNumberString = val, resetParam = False, resetParamFirst = False}, resetParams model)
+      
+                                      Nothing ->
+                                         ({model | fromNumber = 0, toNumber = -100, fromNumberString = val, resetParam = False, resetParamFirst = False}, resetParams model)
+      
+
+                              Nothing ->
+                                  ({model | fromNumber = 0, toNumber = -123, fromNumberString = val, resetParam = False, resetParamFirst = False}, resetParams model)
+
+
+view : Model -> Html Msg
+view model =
+    binanceView model
+
+
+
+binanceView : Model -> Html Msg
+binanceView model=
+    div[class "container-xl", style "background-color" "white", style "border-radius" "25px", style "padding-top" "2.5vh", style "padding-bottom" "3vh"]
+    [
+      div[class "row"]
+      [
+       div[class "col"]
+        [
+          div[class "row"]
+          [
+           div[class ("col "++ getClassCol model Buy), style "padding-left" "3vw", style "margin-left" "1vw"][a[href "#pageSubmenu", class (getClass model Buy), type_ "button",onClick (ChangeWindow Buy)][text "Buy"]]
+         , div[class ("col "++ getClassCol model Sell), style "padding-left" "2.5vw"][ a[href "#pageSubmenu", class (getClass model Sell), type_ "button",onClick (ChangeWindow Sell)][text "Sell"]]
+         , div[class ("col "++ getClassCol model Exchange),style "padding-left" "1.5vw", style "padding-right" "3.5vw", style "margin-right" "1vw"][ a[href "#pageSubmenu", class (getClass model Exchange), type_ "button",onClick (ChangeWindow Exchange)][text "Exchange"]]
+         ]
+        ]
+      ]
+     , div[class "row", style "padding-top" "4vh"]
+      [
+        div[class "col"][exchangeView model.assetPairsCurr model]
+       ]
+    ]
+
+getClassCol: Model -> ActionWindow -> String
+getClassCol model action =
+    case (model.window == action) of
+        True ->
+            "panel_col active"
+        False ->
+            "panel_col"
+
+getClass: Model -> ActionWindow -> String
+getClass model action =
+    case (model.window == action) of
+        True ->
+            "panel_button active"
+        False ->
+            "panel_button"
+
+exchangeView : Status (List AssetPairCurrency)  -> Model   -> Html Msg
+exchangeView statusAssetPairCurrency model =
+    case statusAssetPairCurrency of
+       Loaded statusAssetPairs ->
+                   let
+                       assetPairs =
+                         case model.window of
+                             Exchange ->
+                                 let
+                                     listAll = List.filter (\assetPair -> not (String.contains "EUR" assetPair.quote.title )) statusAssetPairs
+                                 in
+                                 listAll 
+                             _ ->
+                                 let
+                                    subList = List.filter (\assetPair -> (String.contains "EUR" assetPair.quote.title))  statusAssetPairs
+                                 in
+                                    case model.config of
+                                        Just configuration ->
+                                            let
+                                              _ = Debug.log "Config " "Exists"
+                                              subListFilt = List.filter (\assetPair -> (assetPair.base.id  == configuration.currencyId)) subList
+                                            in
+                                            case List.head subListFilt of
+                                               Just asPair ->
+                                                  asPair::subList 
+                                               Nothing ->
+                                                   subList
+                                        Nothing ->
+                                            let
+                                                _ = Debug.log "Config does not" "exist"
+                                            in
+                                            subList
+                       assetPairsTo = 
+                           case model.first of 
+                               Just str ->
+                                  List.filter (\assetPair -> assetPair.base == str) assetPairs
+                               Nothing ->
+                                  assetPairs
+
+                       assetPairsReady = List.Extra.uniqueBy (\assetPair -> assetPair.base.title) assetPairs
+                       assetPairsToReady = List.Extra.uniqueBy (\assetPair -> assetPair.primaryName) assetPairsTo
+                   in
+                      div[]
+                      [  
+                        div[]
+                            [
+                              label[][span[style "color" "rgba(112,112,112,1)", style "font-size" "21px"][text "I want to Spend"]]
+                            , div[class "input-group"]
+                              [ 
+                                input[class "form-control", style "width" "100%",style "font-size" "28px", style "color" "rgba(0,99,166,1)" ,Html.Attributes.value  model.fromNumberString, onInput ChangeFromNumbHand][]
+                              , div[class "input-group-append"]
+                                [
+                                  viewCurrencyDropDownIcon assetPairsReady model
+                                  ,node "editor-select" [][]
+                                ]
+                              ]
+                            , label[style "margin-top" "2.5vh"][text "I want to Buy"]
+                            , div[class "input-group"] 
+                              [ 
+                                input [class "form-control", style "width" "100%", Html.Attributes.value model.toNumberString, onInput ChangeToNumb][]
+                              , div[class "input-group-append"]
+                                [ viewCurrencyDropDownSecond assetPairsToReady  model]
+                              ]
+                            ]
+                      , div[style "pading-bottom" "4vh", style "padding-top" "4vh", style "width" "30%", style "margin" "auto"]
+                        [
+                           button [type_ "button", style "width" "100%" , style "margin" "auto", style "padding-left" "2vw", onClick SendRequest, class "btn btn-primary", style "border-radius" "25px", style "font-size" "1.5rem", style "font-weight" "bold", style "background-color" "rgb(0, 99, 166)", style "line-height" "4vh" ]
+                           [ span[][text "NEXT"] ]
+                        ]
+                      ]
+       _ ->
+         div[][span [][text "No Content" ]]
+
+getMsgForBut : Int -> String ->  Msg
+getMsgForBut action token =
+    case action of
+        1 ->
+            CloseModal 1 token
+        _ -> 
+            CloseModal 2 ""
+
+
+viewModal : Model -> String -> Html Msg
+viewModal model  msg =
+   Grid.container []
+        [{-- Button.button
+            [ Button.attrs [ onClick ShowModal ] ]
+            [ text "Show modal" ]--}
+         Modal.config (CloseModal 2 "")
+            |> Modal.small
+            |> Modal.h5 [] [ text model.messageTitle ]
+            |> Modal.body []
+                [viewTransaction model ]
+            |> Modal.footer []
+                [ Button.button
+                    [ Button.outlinePrimary
+                    , Button.attrs [ onClick (getMsgForBut model.modalAction model.modalToken)  ]
+                    ]
+                    [
+                      case  model.modalAction of
+                        1 ->
+                          text "Verify"
+                        _ ->
+                          text "Ok" 
+                    ]
+                ]
+            |> Modal.view model.modalVisibility
+        ]
+
+calculateGettingSelling : Float -> Float -> Float -> Int -> Float
+calculateGettingSelling rate quantity fee action = 
+    case action of
+        1 ->
+            let
+               sintBuy = (fee/100) +1
+               endValBuy = sintBuy * rate
+               retVal = (endValBuy * quantity)
+            in
+            retVal
+        2 ->
+            let
+                sintSell = 1 - (fee/100)
+                endValSell = sintSell * rate
+                retValSell = (endValSell * quantity)
+            in
+            retValSell
+        3 ->
+            let
+               sintBuy = (fee/100) +1
+               endValBuy = sintBuy * rate
+               retVal = (endValBuy * quantity)
+            in
+            retVal
+
+        _ ->
+            0
+
+viewTransaction : Model -> Html Msg
+viewTransaction model=
+    case model.modalTransaction of
+        Just transaction ->
+          Grid.containerFluid []
+             [ Grid.row []
+               [ Grid.col
+                [ ]
+                 [ span[][text "Get"] ]
+               , Grid.col
+                 []
+                 [
+                   div[][text ((String.fromFloat transaction.srcAmount) ++  " " ++ transaction.tgtCurrency.alias_)]
+                 ]
+                ]
+             ,  Grid.row []
+               [ Grid.col
+                [ ]
+                 [ span[][text "For"] ]
+               , Grid.col
+                 []
+                 [
+                   div[][text ((String.fromFloat (calculateGettingSelling transaction.exchangeRate transaction.srcAmount transaction.tgtCurrency.fee 1)) ++ " "++ transaction.srcCurrency.alias_)]
+                 ]
+                ]
+             ]
+        Nothing ->
+              div[][text model.message]
+
+
+viewCurrencyDropDownSecond : List AssetPairCurrency -> Model -> Html Msg
+viewCurrencyDropDownSecond  assetPairs model =
+    case model.second of
+        Just currency ->
+                 Dropdown.dropdown
+                    model.myDrop2State
+                     { options = [  ]
+                      , toggleMsg = MyDrop2Msg
+                      , toggleButton =
+                          Dropdown.toggle [] [ img [style "width" "40px",style "margin-right" "1vw",src currency.url][],span[style "color" "rgba(0,99,166,1)",style "font-size" "150%", style "font-weight" "bold"][ text currency.alias_ ]]
+                      , items = (List.map (\assetPair -> Dropdown.buttonItem [style "color" "rgba(0,99,166,1)",style "font-size" "150%",style "font-weight" "bold", onClick (SecondSet assetPair.quote)][img [style "margin-right" "1vw",src assetPair.quote.url][], text assetPair.quote.alias_]) assetPairs)
+                     }
+        Nothing ->
+             div[][text "den"]
+
+
+viewCurrencyDropDownIcon : List AssetPairCurrency -> Model  -> Html Msg
+viewCurrencyDropDownIcon  assetPairs model =
+    case model.first of
+        Just currency ->
+                 Dropdown.dropdown
+                    model.myDrop1State
+                     { options = [  ]
+                      , toggleMsg = MyDrop1Msg
+                      , toggleButton =
+                          Dropdown.toggle [] [ img [style "width" "40px",style "margin-right" "1vw",src currency.url][],span[style "color" "rgba(0,99,166,1)",style "font-size" "150%", style "font-weight" "bold"][ text currency.alias_ ]]
+                      , items = (List.map (\assetPair -> Dropdown.buttonItem [style "color" "rgba(0,99,166,1)",style "font-size" "150%",style "font-weight" "bold", onClick (FirstSet assetPair.base)][img [style "margin-right" "1vw",src assetPair.base.url][], text assetPair.base.alias_]) assetPairs)
+                     }
+        Nothing ->
+             div[][text "den"]
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch [Dropdown.subscriptions model.myDrop1State MyDrop1Msg, Dropdown.subscriptions model.myDrop2State MyDrop2Msg]

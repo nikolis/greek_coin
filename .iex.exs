@@ -1,0 +1,22 @@
+alias GreekCoin.Email
+alias GreekCoin.Mailer
+alias GreekCoin.Accounts.User
+alias GreekCoin.Accounts.Credential
+alias GreekCoin.Accounts
+alias GreekCoin.Accounts.LoginAttempt
+alias GreekCoin.Repo
+alias GreekCoin.Security
+alias GreekCoin.Funds
+alias GreekCoin.Funds.Treasury
+alias GreekCoin.Funds.Currency
+alias GreekCoin.Funds.RequestTransaction
+alias GreekCoin.Funds.Deposit
+alias GreekCoin.Funds.Wallet
+alias GreekCoin.Funds.BankDetails
+alias GreekCoin.Funds.Withdraw 
+alias GreekCoin.Newsletter.NewsUser
+alias GreekCoin.Funds.UserBankDetails
+alias GreekCoin.Funds.UserWallet
+alias GreekCoin.Accounting.Inventory
+alias GreekCoin.Accounting.OperationAccount
+

@@ -1,0 +1,4 @@
+<h1> User Verified </h1>
+
+<h2> Email for user <%= @user.credential.email %> has been verified </h2>
+

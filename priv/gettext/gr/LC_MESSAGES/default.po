@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Language: gr\n"
+"Plural-Forms: nplurals=2\n"
+
+#, elixir-format
+#: lib/greek_coin_web/templates/page/index.html.eex:2
+
+msgid "Transaction request failed"
+msgstr "H υποβολή της συναλαγής απέτυχε"
+
+msgid "Transaction success"
+msgstr "H συναλαγή υποβληθηκε με επιτυχια"
+
+msgid "Not enough funds"
+msgstr "Δεν βρέθηκαν αρκετά αποθέματα"
+
+msgid "Success"
+msgstr "Eπιτυχια"

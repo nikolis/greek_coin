@@ -1,0 +1,4 @@
+<h1> Withdrawall Verified </h1>
+
+<h2> Withdrawall for currency <%= @withdraw.currency.alias_ %>  with ammount <%= @withdraw.ammount %>has been verified </h2>
+
