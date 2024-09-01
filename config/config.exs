@@ -88,8 +88,8 @@ config :greek_coin, GreekCoin.Mailer,
 
 
 config :s3_direct_upload,
-  aws_access_key: "AKIA4Z4GRTRXJ73CBUXC",
-  aws_secret_key: "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",
+  aws_access_key: System.get_env("AWS_KEY")
+  aws_secret_key: System.get-env("AWS_SECRET"),
   aws_s3_bucket: "greek.coin.user.images",
   aws_region: "eu-central-1"
 
